@@ -1,0 +1,20 @@
+<!DOCTYPE html>
+<html>
+<head><title>SPA with forms</title></head>
+<body>
+<a href="#!/dashboard">Dashboard</a>
+<a href="#!/audit-log">Audit log</a>
+<a href="/about.html">About</a>
+<form action="/search" method="get">
+<input type="text" name="q">
+<input type="text" name="category">
+<input type="submit" value="Go">
+</form>
+<form action="/api/login" method="post">
+<input type="text" name="username">
+<input type="password" name="password">
+<input type="hidden" name="csrf" value="abc">
+</form>
+<script src="/spa.js"></script>
+</body>
+</html>

@@ -48,6 +48,8 @@ Photon can extract the following data while crawling:
 - Files (pdf, png, xml etc.)
 - Secret keys (auth/API keys & hashes)
 - JavaScript files & Endpoints present in them
+- SPA & hash-based client-side routes (e.g. `#/path`, JS router definitions)
+- HTML forms (action, method & parameter names)
 - Strings matching custom regex pattern
 - Subdomains & DNS related data
 

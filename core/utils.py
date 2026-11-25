@@ -37,7 +37,7 @@ def is_link(url, processed, files):
     Returns:
         bool If `url` should be crawled
     """
-    if url not in processed:
+    if normalize_url(url) not in processed:
         if url.startswith('#') or url.startswith('javascript:'):
             return False
         is_file = url.endswith(BAD_TYPES)
@@ -46,6 +46,15 @@ def is_link(url, processed, files):
             return False
         return True
     return False
+
+
+def normalize_url(url):
+    """Normalize a URL so the same resource is never requested twice.
+
+    Fragments are never sent to the server and a trailing slash does not
+    change the requested resource, so both are stripped.
+    """
+    return url.split('#')[0].rstrip('/')
 
 
 def remove_regex(urls, regex):

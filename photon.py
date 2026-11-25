@@ -45,7 +45,13 @@ from core.utils import (luhn,
                         entropy, regxy,
                         remove_regex,
                         timer,
-                        writer)
+                        writer,
+                        normalize_url)
+from core.spa import (absolutize,
+                      extract_forms,
+                      extract_hash_routes,
+                      extract_spa_routes,
+                      hash_route_of)
 from core.regex import rintels, rendpoint, rhref, rscript, rentropy
 
 from core.zap import zap
@@ -94,6 +100,8 @@ parser.add_argument('--update', help='update photon', dest='update',
                     action='store_true')
 parser.add_argument('--only-urls', help='only extract URLs', dest='only_urls',
                     action='store_true')
+parser.add_argument('--no-spa', help='disable SPA & hash-route discovery',
+                    dest='no_spa', action='store_true')
 parser.add_argument('--wayback', help='fetch URLs from archive.org as seeds',
                     dest='archive', action='store_true')
 args = parser.parse_args()
@@ -142,6 +150,8 @@ else:
 crawl_level = args.level or 2  # Crawling level
 thread_count = args.threads or 2  # Number of threads
 only_urls = bool(args.only_urls)  # Only URLs mode is off by default
+spa_discovery = not args.no_spa  # SPA & hash-route discovery is on by default
+core.config.SPA = spa_discovery
 
 # Variables we are gonna use later to store stuff
 keys = set()  # High entropy strings, prolly secret keys
@@ -155,6 +165,7 @@ external = set()  # URLs that don't belong to the target i.e. out-of-scope
 # URLs that have get params in them e.g. example.com/page.php?id=2
 fuzzable = set()
 endpoints = set()  # URLs found from javascript files
+routes = set()  # Client-side routes of single-page applications
 processed = set(['dummy'])  # URLs that have been crawled
 # URLs that belong to the target i.e. in-scope
 internal = set(args.seeds)
@@ -208,7 +219,7 @@ supress_regex = False
 def intel_extractor(url, response):
     """Extract intel from the response body."""
     for rintel in rintels:
-        res = re.sub(r'<(script).*?</\1>(?s)', '', response)
+        res = re.sub(r'<(script).*?</\1>', '', response, flags=re.S)
         res = re.sub(r'<[^<]+?>', '', res)
         matches = rintel[0].findall(res)
         if matches:
@@ -238,13 +249,41 @@ def remove_file(url):
 
 def extractor(url):
     """Extract details from the response body."""
+    # Skip URLs whose normalized form has already been crawled so the
+    # same resource (e.g. page, page/, page#/route) is never requested twice
+    if normalize_url(url) in processed:
+        return
     response = requester(url, main_url, delay, cook, headers, timeout, host, proxies, user_agents, failed, processed)
     if clone:
         mirror(url, response)
+    if spa_discovery:
+        # Client-side routes hidden in hash fragments and inline scripts
+        for route in extract_spa_routes(response) | extract_hash_routes(response):
+            verb('SPA route', route)
+            routes.add(route)
+        # Forms reveal parameterized endpoints of the application
+        for form in extract_forms(response):
+            target = absolutize(form['action'], url, main_url)
+            if not target.startswith(main_url) or not form['params']:
+                continue
+            form_url = target + '?' + '&'.join(param + '=' for param in form['params'])
+            verb('Form', form_url)
+            fuzzable.add(form_url)
+            if form['method'] == 'get' and normalize_url(form_url) not in processed:
+                internal.add(form_url)
     matches = rhref.findall(response)
     for link in matches:
+        link = link[1].replace('\'', '').replace('"', '')
+        if spa_discovery:
+            # Record hash routes before stripping the fragment
+            route = hash_route_of(link)
+            if route:
+                verb('Hash route', route)
+                routes.add(route)
         # Remove everything after a "#" to deal with in-page anchors
-        link = link[1].replace('\'', '').replace('"', '').split('#')[0]
+        link = link.split('#')[0]
+        if not link:
+            continue
         # Checks if the URLs should be crawled
         if is_link(link, processed, files):
             if link[:4] == 'http':
@@ -289,6 +328,8 @@ def extractor(url):
 
 def jscanner(url):
     """Extract endpoints from JavaScript code."""
+    if normalize_url(url) in processed:
+        return
     response = requester(url, main_url, delay, cook, headers, timeout, host, proxies, user_agents, failed, processed)
     # Extract URLs/endpoints
     matches = rendpoint.findall(response)
@@ -300,6 +341,11 @@ def jscanner(url):
         if not re.search(r'[}{><"\']', match) and not match == '/':
             verb('JS endpoint', match)
             endpoints.add(match)
+    if spa_discovery:
+        # SPA route tables and hash routes live in JavaScript bundles
+        for route in extract_spa_routes(response) | extract_hash_routes(response):
+            verb('SPA route', route)
+            routes.add(route)
 
 
 # Records the time at which crawling started
@@ -378,9 +424,10 @@ if not os.path.exists(output_dir): # if the directory doesn't exist
     os.mkdir(output_dir) # create a new directory
 
 datasets = [files, intel, robots, custom, failed, internal, scripts,
-            external, fuzzable, endpoints, keys]
+            external, fuzzable, endpoints, keys, routes]
 dataset_names = ['files', 'intel', 'robots', 'custom', 'failed', 'internal',
-                 'scripts', 'external', 'fuzzable', 'endpoints', 'keys']
+                 'scripts', 'external', 'fuzzable', 'endpoints', 'keys',
+                 'routes']
 
 writer(datasets, dataset_names, output_dir)
 # Printing out results
@@ -399,7 +446,7 @@ datasets = {
     'custom': list(custom), 'failed': list(failed), 'internal': list(internal),
     'scripts': list(scripts), 'external': list(external),
     'fuzzable': list(fuzzable), 'endpoints': list(endpoints),
-    'keys': list(keys)
+    'keys': list(keys), 'routes': list(routes)
 }
 
 if args.dns:

@@ -1,0 +1,17 @@
+{
+  "root": "/home/dev/feedback/uid38838",
+  "B": "/home/dev/feedback/uid38838",
+  "sha": "d83da60be37310eb007271957b71866d0487d766",
+  "wslDistro": "Ubuntu-26.04",
+  "source": {
+    "owner": "s0md3v",
+    "repo": "Photon",
+    "sha": "d83da60be37310eb007271957b71866d0487d766"
+  },
+  "fork": {
+    "owner": "Rrr119",
+    "repo": "Photon",
+    "cloneUrl": "https://github.com/Rrr119/Photon.git"
+  },
+  "at": "2026-11-25T19:54:31.317Z"
+}

@@ -1,3 +1,11 @@
+#### Unreleased
+- SPA & hash-route discovery: client-side routes (`#/path`, `#!/path`, JS router definitions) are extracted into `routes.txt`
+- HTML form parameter extraction: form endpoints with parameter names are added to `fuzzable` (GET forms are also crawled)
+- JavaScript bundles are now fetched for analysis when SPA discovery is enabled
+- URLs are normalized (fragment & trailing slash stripped) so the same resource is never requested twice
+- new `--no-spa` option to disable SPA discovery (legacy behavior)
+- fixed `intel_extractor` crashing on Python 3.11+ (inline regex flag mid-pattern)
+
 #### v1.3.2
 - add support for socks proxies
 - add rotating proxies

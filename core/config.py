@@ -2,6 +2,8 @@
 
 VERBOSE = False
 
+SPA = True
+
 INTELS = [
     'facebook.com',
     'github.com',

@@ -4,6 +4,9 @@ import time
 import requests
 from requests.exceptions import TooManyRedirects
 
+import core.config
+from core.utils import normalize_url
+
 
 SESSION = requests.Session()
 SESSION.max_redirects = 3
@@ -27,8 +30,9 @@ def requester(
     user_agents = user_agents or ['Photon']
     failed = failed or set()
     processed = processed or set()
-    # Mark the URL as crawled
-    processed.add(url)
+    # Mark the URL as crawled (normalized so the same resource,
+    # e.g. with a hash route fragment, is never requested twice)
+    processed.add(normalize_url(url))
     # Pause/sleep the program for specified time
     time.sleep(delay)
 
@@ -57,8 +61,12 @@ def requester(
         except TooManyRedirects:
             return 'dummy'
 
-        if 'text/html' in response.headers['content-type'] or \
-           'text/plain' in response.headers['content-type']:
+        content_type = response.headers.get('content-type', '')
+        textual = 'text/html' in content_type or 'text/plain' in content_type
+        # SPA route tables live in JavaScript bundles
+        if core.config.SPA and 'javascript' in content_type:
+            textual = True
+        if textual:
             if response.status_code != '404':
                 return response.text
             else:
